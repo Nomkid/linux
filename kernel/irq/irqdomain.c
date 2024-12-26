@@ -1536,6 +1536,7 @@ static int irq_domain_alloc_irqs_locked(struct irq_domain *domain, int irq_base,
             pr_info("irq_domain_insert_irq %d\n", virq + i);
 
 		irq_domain_insert_irq(virq + i);
+		}
 
 	return virq;
 
