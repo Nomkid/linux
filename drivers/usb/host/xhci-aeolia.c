@@ -175,7 +175,7 @@ static int ahci_init_one(struct pci_dev *pdev)
 	resource_size_t		rsrc_start;
 	resource_size_t		rsrc_len;
 
-	VPRINTK("ENTER\n");
+	dev_dbg(&pdev->dev, "ENTER \n");
 
 	WARN_ON((int)ATA_MAX_QUEUE > AHCI_MAX_CMDS);
 
@@ -410,8 +410,8 @@ static int xhci_aeolia_probe(struct pci_dev *dev, const struct pci_device_id *id
 		pci_set_master(dev);
 	}
 
-	if (pci_set_dma_mask(dev, DMA_BIT_MASK(31)) ||
-		pci_set_consistent_dma_mask(dev, DMA_BIT_MASK(31))) {
+	if (dma_set_mask(&dev->dev, DMA_BIT_MASK(31)) ||
+		dma_set_mask_and_coherent(&dev->dev, DMA_BIT_MASK(31))) {
 		return -ENODEV;
 	}
 

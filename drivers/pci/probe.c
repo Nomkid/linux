@@ -2695,10 +2695,9 @@ int pci_scan_slot(struct pci_bus *bus, int devfn)
 	}
 	
 	do {
-		// skip phantom Aeolia devices that bleed through the PCI space
 		if (PCI_SLOT(devfn) != AEOLIA_SLOT_NUM &&
-	    	pci_bus_read_dev_vendor_id(bus, devfn, &l, 60*1000) &&
-	    	(l & 0xffff) == PCI_VENDOR_ID_SONY) {
+		    pci_bus_read_dev_vendor_id(bus, devfn + fn, &l, 60*1000) &&
+		    (l & 0xffff) == PCI_VENDOR_ID_SONY) {
 				fn = next_fn(bus, dev, fn);
 			continue;
 		}
