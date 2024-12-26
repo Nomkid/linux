@@ -4749,7 +4749,6 @@ static struct net_device *sky2_init_netdev(struct sky2_hw *hw, unsigned port,
 		}
 	}
 
-	}
 	/* if the address is invalid, use a random value */
 	if (!is_valid_ether_addr(dev->dev_addr)) {
 		struct sockaddr sa = { AF_UNSPEC };
