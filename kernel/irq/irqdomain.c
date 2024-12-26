@@ -254,6 +254,7 @@ struct irq_domain *__irq_domain_add(struct fwnode_handle *fwnode, unsigned int s
 	if (domain)
 		__irq_domain_publish(domain);
 
+	pr_info("Added domain %s\n", domain->name);
 	return domain;
 }
 EXPORT_SYMBOL_GPL(__irq_domain_add);
@@ -283,7 +284,7 @@ void irq_domain_remove(struct irq_domain *domain)
 
 	mutex_unlock(&irq_domain_mutex);
 
-	pr_debug("Removed domain %s\n", domain->name);
+	pr_info("Removed domain %s\n", domain->name);
 
 	fwnode_dev_initialized(domain->fwnode, false);
 	fwnode_handle_put(domain->fwnode);
@@ -493,7 +494,7 @@ EXPORT_SYMBOL_GPL(irq_domain_check_msi_remap);
  */
 void irq_set_default_host(struct irq_domain *domain)
 {
-	pr_debug("Default domain set to @0x%p\n", domain);
+	pr_info("Default domain set to @0x%p\n", domain);
 
 	irq_default_domain = domain;
 }
@@ -651,7 +652,7 @@ void irq_domain_associate_many(struct irq_domain *domain, unsigned int irq_base,
 	int i;
 
 	of_node = irq_domain_get_of_node(domain);
-	pr_debug("%s(%s, irqbase=%i, hwbase=%i, count=%i)\n", __func__,
+	pr_info("%s(%s, irqbase=%i, hwbase=%i, count=%i)\n", __func__,
 		of_node_full_name(of_node), irq_base, (int)hwirq_base, count);
 
 	for (i = 0; i < count; i++) {
@@ -682,7 +683,7 @@ unsigned int irq_create_direct_mapping(struct irq_domain *domain)
 	of_node = irq_domain_get_of_node(domain);
 	virq = irq_alloc_desc_from(1, of_node_to_nid(of_node));
 	if (!virq) {
-		pr_debug("create_direct virq allocation failed\n");
+		pr_info("create_direct virq allocation failed\n");
 		return 0;
 	}
 	if (virq >= domain->hwirq_max) {
@@ -691,7 +692,7 @@ unsigned int irq_create_direct_mapping(struct irq_domain *domain)
 		irq_free_desc(virq);
 		return 0;
 	}
-	pr_debug("create_direct obtained virq %d\n", virq);
+	pr_info("create_direct obtained virq %d\n", virq);
 
 	if (irq_domain_associate(domain, virq, virq)) {
 		irq_free_desc(virq);
@@ -748,6 +749,8 @@ unsigned int irq_create_mapping_affinity(struct irq_domain *domain,
 {
 	int virq;
 
+	pr_info("irq_create_mapping(0x%p, 0x%lx)\n", domain, hwirq);
+	
 	/* Look for default domain if necessary */
 	if (domain == NULL)
 		domain = irq_default_domain;
@@ -755,6 +758,7 @@ unsigned int irq_create_mapping_affinity(struct irq_domain *domain,
 		WARN(1, "%s(, %lx) called with NULL domain\n", __func__, hwirq);
 		return 0;
 	}
+	pr_info("-> using domain @%p\n", domain);
 
 	mutex_lock(&irq_domain_mutex);
 
@@ -1360,10 +1364,17 @@ struct irq_data *irq_domain_get_irq_data(struct irq_domain *domain,
 {
 	struct irq_data *irq_data;
 
-	for (irq_data = irq_get_irq_data(virq); irq_data;
-	     irq_data = irq_data->parent_data)
-		if (irq_data->domain == domain)
-			return irq_data;
+	for (irq_data = irq_get_irq_data(virq); irq_data; irq_data = irq_data->parent_data) {
+	     if (irq_data != NULL) {
+		     pr_info("irq_data domain=%s\n", irq_data->domain->name);
+	     }
+
+	     if (irq_data->domain == domain) {
+		     return irq_data;
+	     }
+	}
+
+	pr_info("irq_domain_get_irq_data failed for virq %d\n", virq);
 
 	return NULL;
 }
@@ -1476,7 +1487,7 @@ int irq_domain_alloc_irqs_hierarchy(struct irq_domain *domain,
 				    unsigned int nr_irqs, void *arg)
 {
 	if (!domain->ops->alloc) {
-		pr_debug("domain->ops->alloc() is NULL\n");
+		pr_info("domain->ops->alloc() is NULL\n");
 		return -ENOSYS;
 	}
 
@@ -1492,21 +1503,25 @@ static int irq_domain_alloc_irqs_locked(struct irq_domain *domain, int irq_base,
 	if (realloc && irq_base >= 0) {
 		virq = irq_base;
 	} else {
+        pr_info("__irq_domain_alloc_irqs alloc_descs\n");
+
 		virq = irq_domain_alloc_descs(irq_base, nr_irqs, 0, node,
 					      affinity);
 		if (virq < 0) {
-			pr_debug("cannot allocate IRQ(base %d, count %d)\n",
+			pr_info("cannot allocate IRQ(base %d, count %d)\n",
 				 irq_base, nr_irqs);
 			return virq;
 		}
 	}
 
+	pr_info("irq_domain_alloc_irq_data\n");
 	if (irq_domain_alloc_irq_data(domain, virq, nr_irqs)) {
-		pr_debug("cannot allocate memory for IRQ%d\n", virq);
+		pr_info("cannot allocate memory for IRQ%d\n", virq);
 		ret = -ENOMEM;
 		goto out_free_desc;
 	}
 
+	pr_info("irq_domain_alloc_irqs_hierarchy\n");
 	ret = irq_domain_alloc_irqs_hierarchy(domain, virq, nr_irqs, arg);
 	if (ret < 0)
 		goto out_free_irq_data;
@@ -1518,7 +1533,11 @@ static int irq_domain_alloc_irqs_locked(struct irq_domain *domain, int irq_base,
 	}
 
 	for (i = 0; i < nr_irqs; i++)
+        {
+            pr_info("irq_domain_insert_irq %d\n", virq + i);
+
 		irq_domain_insert_irq(virq + i);
+		}
 
 	return virq;
 

@@ -703,7 +703,7 @@ int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
 	int ret;
 
 	ret = ops->msi_check(domain, info, dev);
-	if (ret == 0)
+	if (ret == 0 && ops->msi_prepare)
 		ret = ops->msi_prepare(domain, dev, nvec, arg);
 
 	return ret;
@@ -971,13 +971,23 @@ void __msi_domain_free_irqs(struct irq_domain *domain, struct device *dev)
 	struct msi_desc *desc;
 	int i;
 
+	pr_info("ps4patches: testing free irqs\n");
+
 	/* Only handle MSI entries which have an interrupt associated */
 	msi_for_each_desc(desc, dev, MSI_DESC_ASSOCIATED) {
+		dev_info(dev, "freeing %d for domain %s, device has domain %s, has %d irqs used\n",
+				 i, domain->name, dev_get_msi_domain(dev)->name, desc->nvec_used);
+
 		/* Make sure all interrupts are deactivated */
 		for (i = 0; i < desc->nvec_used; i++) {
 			irqd = irq_domain_get_irq_data(domain, desc->irq + i);
 			if (irqd && irqd_is_activated(irqd))
 				irq_domain_deactivate_irq(irqd);
+			
+			if (irqd == NULL) {
+			pr_info("irq_data was NULL\n");
+
+			}
 		}
 
 		irq_domain_free_irqs(desc->irq, desc->nvec_used);
