@@ -469,7 +469,8 @@ struct f_resource
 {
 	__int64 resource_i_ptr;
 	__int64 r_bustag;
-	void __iomem * r_bushandle;
+	void 
+	 * r_bushandle;
 };
 
 struct ahci_controller
