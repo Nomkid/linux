@@ -116,7 +116,21 @@ static void baikal_msi_write_msg(struct irq_data *data, struct msi_msg *msg)
 		msg->address_lo, msg->data, data->mask, data->irq, data->hwirq, sc);
 
 
-	pci_msi_domain_write_msg(data, msg);
+	//function no longer static
+	//https://patchwork.kernel.org/project/linux-pci/patch/20211126223824.441771859@linutronix.de/
+	//either make it non static again or just manually do the function
+	//pci_msi_domain_write_msg(data, msg);
+
+	/* Copied from irqdomain.c */
+
+	struct msi_desc *desc = irq_data_get_msi_desc(data);
+
+	/*
+	 * For MSI-X desc->irq is always equal to irq_data->irq. For
+	 * MSI only the first interrupt of MULTI MSI passes the test.
+	 */
+	if (desc->irq == data->irq)
+		__pci_write_msi_msg(desc, msg);
 }
 
 static void apcie_msi_write_msg(struct irq_data *data, struct msi_msg *msg)
@@ -159,7 +173,7 @@ static void baikal_pcie_msi_unmask(struct irq_data *data)
 	struct pci_dev *pdev = msi_desc_to_pci_dev(desc);
 	int msi_allocated = desc->nvec_used;
 	int msi_msgnum = pci_msi_vec_count(pdev);
-	u32 msi_mask = desc->msi_mask; //(1LL << msi_msgnum) - 1;
+	u32 msi_mask = desc->pci.msi_mask; //(1LL << msi_msgnum) - 1;
 
 	u32 result;
 	asm volatile(".intel_syntax noprefix;"
@@ -183,9 +197,9 @@ static void baikal_pcie_msi_unmask(struct irq_data *data)
 
 	dev_info(data->common->msi_desc->dev, "bpcie_msi_unmask(msi_mask=0x%X, msi_allocated=0x%X)\n", msi_mask, msi_allocated);
 	//msi_mask = 0;
-	pci_write_config_dword(pdev, desc->mask_pos,
+	pci_write_config_dword(pdev, desc->pci.mask_pos,
 			       msi_mask);
-	desc->msi_mask = msi_mask;
+	desc->pci.msi_mask = msi_mask;
 
 	//this code equals msi_mask = 0;
 }
@@ -198,7 +212,7 @@ static void baikal_pcie_msi_mask(struct irq_data *data)
 	u8 subfunc = data->hwirq & 0x1f;
 	struct msi_desc *desc = irq_data_get_msi_desc(data);
 	struct pci_dev *pdev = msi_desc_to_pci_dev(desc);
-	u32 msi_mask = desc->msi_mask;
+	u32 msi_mask = desc->pci.msi_mask;
 	u32 msi_allocated = desc->nvec_used; //pci_msi_vec_count(msi_desc_to_pci_dev(desc)); 32 for bpcie glue
 
 	if (msi_allocated > 0)
@@ -226,9 +240,9 @@ static void baikal_pcie_msi_mask(struct irq_data *data)
 
 	dev_info(data->common->msi_desc->dev, "bpcie_msi_mask(msi_mask=0x%X, msi_allocated=0x%X)\n", msi_mask, msi_allocated);
 	//msi_mask = 0;
-	pci_write_config_dword(pdev, desc->mask_pos,
+	pci_write_config_dword(pdev, desc->pci.mask_pos,
 			       msi_mask);
-	desc->msi_mask = msi_mask;
+	desc->pci.msi_mask = msi_mask;
 	//TODO: disable ht. See apcie_bpcie_msi_ht_disable_and_bpcie_set_msi_mask
 
 	//this code equals msi_mask = 0xFFFFFFFF;
@@ -241,7 +255,7 @@ static void apcie_msi_unmask(struct irq_data *data)
 	struct msi_desc *desc = irq_data_get_msi_desc(data);
 
 	if(desc) {
-		desc->msi_mask |= data->mask;
+		desc->pci.msi_mask |= data->mask;
 	} else {
 		pr_debug("no msi_desc at apcie_msi_unmask\n");
 	}
@@ -257,7 +271,7 @@ static void apcie_msi_mask(struct irq_data *data)
 	struct msi_desc *desc = irq_data_get_msi_desc(data);
 
 	if (desc) {
-		desc->msi_mask &= ~data->mask;
+		desc->pci.msi_mask &= ~data->mask;
 	} else {
 		pr_debug("no msi_desc at apcie_msi_mask\n");
 	}
