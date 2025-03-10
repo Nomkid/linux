@@ -3419,6 +3419,8 @@ bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type)
 	case CHIP_KAVERI:
 	case CHIP_KABINI:
 	case CHIP_MULLINS:
+	case CHIP_LIVERPOOL:
+ 	case CHIP_GLADIUS:
 		/*
 		 * We have systems in the wild with these ASICs that require
 		 * VGA support which is not supported with DC.
